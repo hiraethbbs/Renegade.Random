@@ -71,7 +71,6 @@ var
   RandomCharBuffer : PCChar;
   Return : CInt;
 begin
-  Writeln(SYS_getrandom);
   GetMem(RandomCharBuffer, NBytes);
   Return := syscall(SYS_getrandom, @RandomCharBuffer^, NBytes, GRND_DEFAULT);
   Move(RandomCharBuffer[0], RandomByteBuffer[0], NBytes);

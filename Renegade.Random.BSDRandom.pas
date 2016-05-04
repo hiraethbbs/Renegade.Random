@@ -13,7 +13,7 @@
 {   Foundation, either version 3 of the License, or     }
 {   (at your option) any later version.                 }
 {                                                       }
-{   Foobar is distributed in the hope that it will be   }
+{   Renegade is distributed in the hope that it will be }
 {   useful, but WITHOUT ANY WARRANTY; without even the  }
 {   implied warranty of MERCHANTABILITY or FITNESS FOR  }
 {   A PARTICULAR PURPOSE.  See the GNU General Public   }
@@ -40,6 +40,7 @@ Unit Renegade.Random.BSDRandom;
 interface
 
 uses
+  CTypes,
   Objects,
   Classes,
   SysUtils,
@@ -49,10 +50,15 @@ uses
 type
   PBSDRandom = ^BSDRandom;
   BSDRandom = class (RandomTrait, RandomInterface)
+    private
+      function GetSystemBytes(var RandomByteBuffer : TBytes; NBytes : SizeUint) : CInt;
     public
       function GetBytes(NBytes : SizeUInt) : TBytes;
       function GetString(NBytes : SizeUInt) : AnsiString;
   end;
+
+procedure arc4random_buf(var Buffer : PCChar; StringLength : SizeInt);
+  cdecl;varargs;external 'c' name 'arc4random_buf';
 
 implementation
 

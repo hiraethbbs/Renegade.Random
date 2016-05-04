@@ -24,8 +24,6 @@ begin
   Assert(RRandom.InheritsFrom(RandomTrait));
   S := RRandom.GetString(22);
   T := RRandom.GetBytes(22);
-  Writeln(S);
-  Writeln(Length(S));
   Assert(Length(S) = 22);
   Assert(High(S) = 22);
   Assert(Low(S) = 1);
