@@ -57,11 +57,22 @@ type
       function GetString(NBytes : SizeUInt) : AnsiString;
   end;
 
-procedure arc4random_buf(var Buffer : PCChar; StringLength : SizeInt);
+procedure arc4random_buf(var Buffer : PCChar; StringLength : CInt);
   cdecl;varargs;external 'c' name 'arc4random_buf';
 
 implementation
 
+function GetSystemBytes(var RandomByteBuffer : TBytes; NBytes : SizeUint) : CInt;
+begin
+  arc4random_buf(@RandomByteBuffer^, NBytes);
+  if Length(RandomByteBuffer^) <> NBytes then
+    begin
+      Result := -1;
+    end else
+    begin
+      Result := Length(RandomByteBuffer^);
+    end;
+end;
 
 function BSDRandom.GetBytes(NBytes : SizeUInt) : TBytes;
 var
