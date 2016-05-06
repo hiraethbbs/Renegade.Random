@@ -48,6 +48,7 @@ uses
   Renegade.Random.URandom;
 
 type
+  PCChar = ^CChar;
   PBSDRandom = ^BSDRandom;
   BSDRandom = class (RandomTrait, RandomInterface)
     private
@@ -57,20 +58,25 @@ type
       function GetString(NBytes : SizeUInt) : AnsiString;
   end;
 
-procedure arc4random_buf(var Buffer : PCChar; StringLength : CInt);
-  cdecl;varargs;external 'c' name 'arc4random_buf';
+procedure arc4random_buf(var Buffer; NBytes : csize_t);
+  cdecl;external 'c' name 'arc4random_buf';
 
 implementation
 
-function GetSystemBytes(var RandomByteBuffer : TBytes; NBytes : SizeUint) : CInt;
+function BSDRandom.GetSystemBytes(var RandomByteBuffer : TBytes; NBytes : SizeUint) : CInt;
+var
+  CharBuffer : array of pcuint8;
 begin
-  arc4random_buf(@RandomByteBuffer^, NBytes);
-  if Length(RandomByteBuffer^) <> NBytes then
+  SetLength(CharBuffer, NBytes);
+  arc4random_buf(CharBuffer[0], NBytes);
+  if Length(CharBuffer) <> NBytes then
     begin
+      RandomByteBuffer[0] := 0;
       Result := -1;
     end else
     begin
-      Result := Length(RandomByteBuffer^);
+      Move(CharBuffer[Low(CharBuffer)], RandomByteBuffer[0], NBytes);
+      Result := High(RandomByteBuffer);
     end;
 end;
 
@@ -78,6 +84,7 @@ function BSDRandom.GetBytes(NBytes : SizeUInt) : TBytes;
 var
   RandomBuffer : AnsiString;
 begin
+  SetLength(RandomBuffer, NBytes);
   SetLength(Result, NBytes);
   RandomBuffer := GetString(NBytes);
   Move(RandomBuffer[1], Result[0], NBytes);
@@ -85,11 +92,13 @@ end;
 
 function BSDRandom.GetString(NBytes : SizeUInt) : AnsiString;
 var
-  TURandom : URandom;
+  RandomBuffer : TBytes;
+  B : SizeInt;
 begin
-  TURandom := URandom.Create;
+  SetLength(RandomBuffer, (NBytes*2));
   SetLength(Result, NBytes);
-  Result := TURandom.GetString(NBytes);
+  B := GetSystemBytes(RandomBuffer, (NBytes*2));
+  Move(RandomBuffer[0], Result[1], NBytes);
 end;
 
 end.
