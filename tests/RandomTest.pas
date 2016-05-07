@@ -46,6 +46,7 @@ begin
   Assert(Length(S) = 22);
   Assert(High(S) = 22);
   Assert(Low(S) = 1);
+  Writeln(S);
   for i := Low(S) to High(S) do
     begin
       Assert(S[i] in [#0..#255]);
@@ -61,7 +62,7 @@ begin
     end;
     RRandom.Free;
     try // Check for access violation after free.
-      RRandom.GetString(22);
+      S := RRandom.GetString(22);
     except
       on e: Exception do
         begin

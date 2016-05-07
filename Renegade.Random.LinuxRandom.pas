@@ -34,83 +34,96 @@
 {*******************************************************}
 
 {$mode objfpc}{$H+}
-{$interfaces corba}
-Unit Renegade.Random;
+Unit Renegade.Random.LinuxRandom;
 
 interface
 
 uses
+  CTypes,
   Objects,
   Classes,
   SysUtils,
-  Renegade.Random.RandomInterface,
-{$IF DEFINED(LINUX)}
-  Renegade.Random.LinuxRandom
-{$ELSEIF DEFINED(WINDOWS)}
-  Renegade.Random.WinRandom
-{$ELSEIF DEFINED(BSD)}
-  Renegade.Random.BSDRandom
-{$ELSE}
-  Renegade.Random.Generic;
-{$ENDIF}
- ;
+  Renegade.Random.RandomInterface;
+
+const
+  {$IF DEFINED(CPU64)} SYS_getrandom = 318;
+  {$ELSEIF DEFINED(CPU32)} SYS_getrandom = 355;
+  {$ELSE} SYS_getrandom = 278; {$ENDIF}
+  GRND_DEFAULT = $0000;
 
 type
-  PRandom = ^TRandom;
-  TRandom = class (RandomTrait, RandomInterface)
+  PCChar = ^CChar;
+  PLinuxRandom = ^LinuxRandom;
+  LinuxRandom = class (RandomTrait, RandomInterface)
     private
-      FRandomGenerator :  RandomInterface;
-      procedure SetRandomGenerator(GeneratorClass : RandomInterface);
+      function GetSystemBytes(var RandomByteBuffer : TBytes; NBytes : SizeUint) : CInt;
     public
-      constructor Init;
-      destructor Destroy; override;
-      procedure SetDefaultGenerator;
       function GetBytes(NBytes : SizeUInt) : TBytes;
       function GetString(NBytes : SizeUInt) : AnsiString;
-      property RandomGenerator : RandomInterface read FRandomGenerator write SetRandomGenerator;
   end;
+
+function syscall(NRGetRandom : CInt) : CInt;cdecl;varargs;external 'c' name 'syscall';
 
 implementation
 
-
-constructor TRandom.Init;
+function LinuxRandom.GetSystemBytes(var RandomByteBuffer : TBytes; NBytes : SizeUint) : CInt;
+var
+  RandomCharBuffer : PCChar;
+  Return : CInt;
 begin
-  SetDefaultGenerator;
+  GetMem(RandomCharBuffer, NBytes);
+  Return := syscall(SYS_getrandom, @RandomCharBuffer^, NBytes, GRND_DEFAULT);
+  Move(RandomCharBuffer[0], RandomByteBuffer[0], NBytes);
+  FreeMem(RandomCharBuffer);
+  Result := Return;
 end;
 
-destructor TRandom.Destroy;
-begin
-  inherited Destroy;
-end;
-
-procedure TRandom.SetRandomGenerator(GeneratorClass : RandomInterface);
-begin
-  FRandomGenerator := GeneratorClass;
-end;
-
-procedure TRandom.SetDefaultGenerator;
-begin
-  {$IF DEFINED(LINUX)}
-    FRandomGenerator := LinuxRandom.Create;
-  {$ELSEIF DEFINED(WINDOWS)}
-    FRandomGenerator := WinRandom.Create;
-  {$ELSEIF DEFINED(BSD)}
-    FRandomGenerator := BSDRandom.Create;
-  {$ELSE}
-    FRandomGenerator := RandomGeneric.Create;
-  {$ENDIF}
-end;
-
-function TRandom.GetBytes(NBytes : SizeUInt) : TBytes;
+function LinuxRandom.GetBytes(NBytes : SizeUInt) : TBytes;
+var
+  RandomBuffer : AnsiString;
 begin
   SetLength(Result, NBytes);
-  Result := FRandomGenerator.GetBytes(NBytes);
+  SetLength(RandomBuffer, NBytes);
+  RandomBuffer := GetString(NBytes);
+  Move(RandomBuffer[1], Result[0], NBytes);
 end;
-function TRandom.GetString(NBytes : SizeUInt) : AnsiString;
-begin
-  SetLength(Result, NBytes);
-  Result := FRandomGenerator.GetString(NBytes);
 
+function LinuxRandom.GetString(NBytes : SizeUInt) : AnsiString;
+var
+  Buffer : TFileStream;
+  RandomByteBuffer : TBytes;
+  ReadBytes : SizeUInt;
+  SysBytesRead : CInt;
+begin
+  SetLength(RandomByteBuffer, (NBytes*2));
+  SetLength(Result, NBytes);
+  SysBytesRead := GetSystemBytes(RandomByteBuffer, (NBytes*2));
+  if (SysBytesRead <> (NBytes*2)) then
+    begin
+      if FileExists('/dev/urandom') then
+        begin
+          Writeln('URandom');
+          Buffer := TFileStream.Create('/dev/urandom', fmOpenRead);
+          Buffer.Position := 0;
+          ReadBytes := 0;
+          while ReadBytes <= (NBytes*2) do
+            begin
+              Buffer.Read(RandomByteBuffer[ReadBytes], SizeOf(RandomByteBuffer));
+              Inc(ReadBytes);
+            end;
+          Buffer.Free;
+        end
+        else if (not FileExists('/dev/udrandom')) then
+        begin
+            Writeln('Random');
+            RandomByteBuffer := MTRandomBytes((NBytes*2));
+        end else
+        begin
+          raise Exception.Create('All methods to aquire random bytes failed.')
+            at get_caller_addr(get_frame), get_caller_frame(get_frame);
+        end;
+    end;
+  Move(RandomByteBuffer[0], Result[1], NBytes);
 end;
 
 end.
