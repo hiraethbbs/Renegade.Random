@@ -36,7 +36,8 @@
 {$mode objfpc}{$H+}
 {$interfaces corba}
 {$codepage UTF8}
-Unit Renegade.Random.RandomInterface;
+
+Unit Random.RandomInterface;
 
 interface
 
@@ -74,11 +75,11 @@ function RandomTrait.MTRandomBytes(NBytes : SizeUInt) : TBytes;
 var
   i : SizeUint;
 begin
-  Randomize;
+  System.Randomize;
   SetLength(Result, (NBytes*2));
   for i := 0 to (NBytes*2) do
     begin
-      Result[i] := Random(MaxInt) mod 256;
+      Result[i] := System.Random(MaxInt) mod 256;
     end;
   SetLength(Result, NBytes);
 end;

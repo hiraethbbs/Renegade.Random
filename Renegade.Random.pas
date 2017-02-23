@@ -35,6 +35,8 @@
 
 {$mode objfpc}{$H+}
 {$interfaces corba}
+{$codepage utf-8}
+{ namespace Renegade.Random }
 Unit Renegade.Random;
 
 interface
@@ -43,15 +45,15 @@ uses
   Objects,
   Classes,
   SysUtils,
-  Renegade.Random.RandomInterface,
+  Random.RandomInterface,
 {$IF DEFINED(LINUX)}
-  Renegade.Random.LinuxRandom
+  Random.LinuxRandom
 {$ELSEIF DEFINED(WINDOWS)}
-  Renegade.Random.WinRandom
+  Random.WinRandom
 {$ELSEIF DEFINED(BSD)}
-  Renegade.Random.BSDRandom
+  Random.BSDRandom
 {$ELSE}
-  Renegade.Random.Generic;
+  Random.Generic;
 {$ENDIF}
  ;
 

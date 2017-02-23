@@ -34,51 +34,43 @@
 {*******************************************************}
 
 {$mode objfpc}{$H+}
-Unit Renegade.Random.LinuxRandom;
+{ namespace Renegade.Random }
+Unit Random.WinRandom;
 
 interface
 
 uses
-  CTypes,
   Objects,
   Classes,
   SysUtils,
-  Renegade.Random.RandomInterface;
+  Windows,
+  Random.RandomInterface;
 
 const
-  {$IF DEFINED(CPU64)} SYS_getrandom = 318;
-  {$ELSEIF DEFINED(CPU32)} SYS_getrandom = 355;
-  {$ELSE} SYS_getrandom = 278; {$ENDIF}
-  GRND_DEFAULT = $0000;
+  CRYPT_VERIFYCONTEXT = $F0000000;
+  CRYPT_MACHINE_KEYSET = 32;
+  PROV_RSA_FULL  = 1;
+  CRYPT_NEWKEYSET = 8;
+
 
 type
-  PCChar = ^CChar;
-  PLinuxRandom = ^LinuxRandom;
-  LinuxRandom = class (RandomTrait, RandomInterface)
-    private
-      function GetSystemBytes(var RandomByteBuffer : TBytes; NBytes : SizeUint) : CInt;
+  HCRYPTPROV = ULONG_PTR;
+  PWinRandom = ^WinRandom;
+  WinRandom = class (RandomTrait, RandomInterface)
     public
       function GetBytes(NBytes : SizeUInt) : TBytes;
       function GetString(NBytes : SizeUInt) : AnsiString;
   end;
 
-function syscall(NRGetRandom : CInt) : CInt;cdecl;varargs;external 'c' name 'syscall';
+  function CryptAcquireContextW(var phProv: HCRYPTPROV; pszContainer: LPCTSTR;
+    pszProvider: LPCTSTR; dwProvType: DWORD; dwFlags: DWORD): BOOL;stdcall; external 'advapi32' name 'CryptAcquireContextW';
+  function CryptGenRandom(hProv: HCRYPTPROV; dwLen: DWORD;
+    var pbBuffer: BYTE): BOOL; stdcall; external 'advapi32' name 'CryptGenRandom';
 
 implementation
 
-function LinuxRandom.GetSystemBytes(var RandomByteBuffer : TBytes; NBytes : SizeUint) : CInt;
-var
-  RandomCharBuffer : PCChar;
-  Return : CInt;
-begin
-  GetMem(RandomCharBuffer, NBytes);
-  Return := syscall(SYS_getrandom, @RandomCharBuffer^, NBytes, GRND_DEFAULT);
-  Move(RandomCharBuffer[0], RandomByteBuffer[0], NBytes);
-  FreeMem(RandomCharBuffer);
-  Result := Return;
-end;
 
-function LinuxRandom.GetBytes(NBytes : SizeUInt) : TBytes;
+function WinRandom.GetBytes(NBytes : SizeUInt) : TBytes;
 var
   RandomBuffer : AnsiString;
 begin
@@ -88,42 +80,41 @@ begin
   Move(RandomBuffer[1], Result[0], NBytes);
 end;
 
-function LinuxRandom.GetString(NBytes : SizeUInt) : AnsiString;
+function WinRandom.GetString(NBytes : SizeUInt) : AnsiString;
 var
-  Buffer : TFileStream;
-  RandomByteBuffer : TBytes;
-  ReadBytes : SizeUInt;
-  SysBytesRead : CInt;
+  RandomBuffer : ^BYTE;
+  hCryptProv : ^ULONG_PTR;
+  WinCrypt : Boolean;
+  ReturnString : AnsiString;
+  i, Bytes : SizeInt;
+  ReturnBytes : TBytes;
 begin
-  SetLength(RandomByteBuffer, (NBytes*2));
-  SetLength(Result, NBytes);
-  SysBytesRead := GetSystemBytes(RandomByteBuffer, (NBytes*2));
-  if (SysBytesRead <> (NBytes*2)) then
+  GetMem(RandomBuffer, (NBytes * 2));
+  CryptAcquireContextW(hCryptProv^, nil, nil, PROV_RSA_FULL,
+    CRYPT_NEWKEYSET or CRYPT_MACHINE_KEYSET or CRYPT_VERIFYCONTEXT );
+  WinCrypt := CryptGenRandom(hCryptProv^, (NBytes * 2), RandomBuffer^);
+  SetLength(ReturnString, (NBytes*2));
+  if WinCrypt then
     begin
-      if FileExists('/dev/urandom') then
+      for i := 1 to (NBytes*2) do
         begin
-          Writeln('URandom');
-          Buffer := TFileStream.Create('/dev/urandom', fmOpenRead);
-          Buffer.Position := 0;
-          ReadBytes := 0;
-          while ReadBytes <= (NBytes*2) do
-            begin
-              Buffer.Read(RandomByteBuffer[ReadBytes], SizeOf(RandomByteBuffer));
-              Inc(ReadBytes);
-            end;
-          Buffer.Free;
-        end
-        else if (not FileExists('/dev/udrandom')) then
-        begin
-            Writeln('Random');
-            RandomByteBuffer := MTRandomBytes((NBytes*2));
-        end else
-        begin
-          raise Exception.Create('All methods to aquire random bytes failed.')
-            at get_caller_addr(get_frame), get_caller_frame(get_frame);
+          ReturnString[i] := Chr(RandomBuffer[i]);
         end;
+    end else
+    begin
+      SetLength(ReturnBytes, (NBytes*2));
+      ReturnBytes := MTRandomBytes((NBytes*2));
     end;
-  Move(RandomByteBuffer[0], Result[1], NBytes);
+  SetLength(Result, NBytes);
+  FreeMem(RandomBuffer, (NBytes * 2));
+  if WinCrypt then
+    begin
+      Move(ReturnString[1], Result[1], NBytes);
+    end else
+    begin
+      Move(ReturnBytes[0], Result[1], NBytes);
+    end;
+
 end;
 
 end.

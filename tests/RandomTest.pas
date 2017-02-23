@@ -4,8 +4,8 @@ Program RandomTest;
 
 Uses
   Renegade.Random,
-  Renegade.Random.Generic,
-  Renegade.Random.RandomInterface,
+  Random.Generic,
+  Random.RandomInterface,
   Classes,
   SysUtils;
 

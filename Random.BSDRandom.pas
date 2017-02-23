@@ -33,9 +33,10 @@
 {  `--- ---'                                            }
 {*******************************************************}
 
-{ ???: Todo - use arc4random_buf }
 {$mode objfpc}{$H+}
-Unit Renegade.Random.BSDRandom;
+{$codepage utf-8}
+{namespace Renegade.Random }
+Unit Random.BSDRandom;
 
 interface
 
@@ -44,8 +45,8 @@ uses
   Objects,
   Classes,
   SysUtils,
-  Renegade.Random.RandomInterface,
-  Renegade.Random.URandom;
+  Random.RandomInterface,
+  Random.URandom;
 
 type
   PCChar = ^CChar;
