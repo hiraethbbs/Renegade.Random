@@ -34,96 +34,45 @@
 {*******************************************************}
 
 {$mode objfpc}{$H+}
-Unit Renegade.Random.URandom;
+{ namespace Renegade.Random }
+Unit Random.Generic;
 
 interface
 
 uses
-  CTypes,
   Objects,
   Classes,
   SysUtils,
-  Renegade.Random.RandomInterface;
-
-const
-  {$IF DEFINED(CPU64)} SYS_getrandom = 318;
-  {$ELSEIF DEFINED(CPU32)} SYS_getrandom = 355;
-  {$ELSE} SYS_getrandom = 278; {$ENDIF}
-  GRND_DEFAULT = $0000;
+  Random.RandomInterface;
 
 type
-  PCChar = ^CChar;
-  PURandom = ^URandom;
-  URandom = class (RandomTrait, RandomInterface)
-    private
-      function GetSystemBytes(var RandomByteBuffer : TBytes; NBytes : SizeUint) : CInt;
+  PRandomGeneric = ^RandomGeneric;
+  RandomGeneric = class (RandomTrait, RandomInterface)
     public
       function GetBytes(NBytes : SizeUInt) : TBytes;
       function GetString(NBytes : SizeUInt) : AnsiString;
   end;
 
-function syscall(NRGetRandom : CInt) : CInt;cdecl;varargs;external 'c' name 'syscall';
-
 implementation
 
-function URandom.GetSystemBytes(var RandomByteBuffer : TBytes; NBytes : SizeUint) : CInt;
-var
-  RandomCharBuffer : PCChar;
-  Return : CInt;
-begin
-  GetMem(RandomCharBuffer, NBytes);
-  Return := syscall(SYS_getrandom, @RandomCharBuffer^, NBytes, GRND_DEFAULT);
-  Move(RandomCharBuffer[0], RandomByteBuffer[0], NBytes);
-  FreeMem(RandomCharBuffer);
-  Result := Return;
-end;
 
-function URandom.GetBytes(NBytes : SizeUInt) : TBytes;
+function RandomGeneric.GetBytes(NBytes : SizeUInt) : TBytes;
 var
   RandomBuffer : AnsiString;
 begin
   SetLength(Result, NBytes);
-  SetLength(RandomBuffer, NBytes);
   RandomBuffer := GetString(NBytes);
   Move(RandomBuffer[1], Result[0], NBytes);
 end;
 
-function URandom.GetString(NBytes : SizeUInt) : AnsiString;
+function RandomGeneric.GetString(NBytes : SizeUInt) : AnsiString;
 var
-  Buffer : TFileStream;
-  RandomByteBuffer : TBytes;
-  ReadBytes : SizeUInt;
-  SysBytesRead : CInt;
+  ByteBuffer : TBytes;
 begin
-  SetLength(RandomByteBuffer, (NBytes*2));
   SetLength(Result, NBytes);
-  SysBytesRead := GetSystemBytes(RandomByteBuffer, (NBytes*2));
-  if (SysBytesRead <> (NBytes*2)) then
-    begin
-      if FileExists('/dev/urandom') then
-        begin
-          Writeln('URandom');
-          Buffer := TFileStream.Create('/dev/urandom', fmOpenRead);
-          Buffer.Position := 0;
-          ReadBytes := 0;
-          while ReadBytes <= (NBytes*2) do
-            begin
-              Buffer.Read(RandomByteBuffer[ReadBytes], SizeOf(RandomByteBuffer));
-              Inc(ReadBytes);
-            end;
-          Buffer.Free;
-        end
-        else if (not FileExists('/dev/udrandom')) then
-        begin
-            Writeln('Random');
-            RandomByteBuffer := MTRandomBytes((NBytes*2));
-        end else
-        begin
-          raise Exception.Create('All methods to aquire random bytes failed.')
-            at get_caller_addr(get_frame), get_caller_frame(get_frame);
-        end;
-    end;
-  Move(RandomByteBuffer[0], Result[1], NBytes);
+  SetLength(ByteBuffer, (NBytes*2));
+  ByteBuffer := MTRandomBytes((NBytes*2));
+  Move(ByteBuffer[0], Result[1], NBytes);
 end;
 
 end.

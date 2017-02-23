@@ -30,7 +30,7 @@ begin
   R.Free;
 ```
 
-You can also use a custom random generator.  It needs to implement Renegade.Random.RandomInterface;
+You can also use a custom random generator.  It needs to implement Random.RandomInterface;
 ```pascal
 Program RandomTest;
 {$mode objfpc}{$H+}
@@ -56,8 +56,8 @@ begin
 ```
 
 
-  * On Linux systems TRandom reads from /dev/urandom.
+  * On Linux systems TRandom trys to use syscall(SYS_getrandom) if that fails it reads from /dev/urandom and then /dev/random before failing.
   * On Windows systems TRandom uses Windows built in [CryptGenRandom](https://msdn.microsoft.com/en-us/library/windows/desktop/aa379942(v=vs.85).aspx "CryptGenRandom") function.
-  * On BSD systems TRandom reads from /dev/urandom. (TODO : read from [arc4random_buf](https://www.freebsd.org/cgi/man.cgi?query=arc4random_buf&sektion=3 "arc4random_buf") this is the same on Mac systems, because Mac = FreeBSD)
+  * On BSD systems TRandom uses arc4random_buf. (Done : read from [arc4random_buf](https://www.freebsd.org/cgi/man.cgi?query=arc4random_buf&sektion=3 "arc4random_buf") this is the same on Mac systems, because Mac = FreeBSD)
 
 TRandom will fall back on Free Pascal's [Random](http://www.freepascal.org/docs-html/rtl/system/random.html "Random") function which uses the [Mersenne Twister](https://en.wikipedia.org/wiki/Mersenne_Twister "Mersenne Twister") algorithm to get random bytes.
